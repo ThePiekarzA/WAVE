@@ -1,52 +1,47 @@
 from scipy import io
 from matplotlib import pyplot as plt
 import numpy as np
-from utils import *
+from WAVE_functions import *
 
-Name = "./test_data/sel100m"
+# load dataset
+Name = "./test_data/sel114m"
 matName = Name + ".mat"
 ecg = io.loadmat(matName)
 ecg = ecg['val'][0, :]
-infoName = Name + ".info"
 
-acc_pts = 5
+# mark R points
+r_idx100 = [143, 347, 537, 720, 910, 1098, 1296, 1501, 1697, 1890, 2078, 2271]
+r_idx102 = [148, 351, 555, 763, 979, 1197, 1404, 1601, 1800, 2004, 2213, 2422]
+r_idx103 = [184, 400, 608, 819, 1029, 1246, 1477, 1697, 1905, 2113, 2324]
+r_idx104 = [211, 416, 622, 817, 1019, 1228, 1428, 1633, 1838, 2043, 2242, 2434]
+r_idx114 = [218, 507, 797, 1081, 1367, 1640, 1907, 2201]
+
+r_idx = r_idx114
+
+# constant definitions
 frequency = 250
 interval = 1/frequency
 
-probes_200ms = np.uint16(0.200 * frequency)  # number of probes within 200ms
-probes_15ms = np.uint16(0.015 * frequency) + 1  # number of probes within 15ms
-velocity_threshold_inc = 750.
-r_idx = np.array((13, 1), dtype=np.uint16)
-r_idx = [143, 347, 537, 720, 910, 1098, 1296, 1501, 1697, 1890, 2078, 2271, 2459]
+# # interval sizes
+# probes_200ms = np.uint16(0.200 * frequency)  # number of probes within 200ms
+# probes_15ms = np.uint16(0.015 * frequency) + 1  # number of probes within 15ms
 
+# plot ecg
 fig = plt.figure()
 plt.plot(ecg)
 plt.plot(r_idx, ecg[r_idx], 'rx')
 
-for qrs_idx in r_idx:  # main loop over qrs values
-    speed = []
-    for speed_idx in range(qrs_idx, qrs_idx - probes_200ms, -1):  # searching 200ms before R-peak
-        speed.append(np.abs((ecg[speed_idx] - ecg[speed_idx-1]) / interval))  # compute and save speed
-    speed_down = np.array(speed, dtype=np.float32)
-    velocity_threshold = 100.
+# main loop over qrs values
+for qrs_idx in r_idx:
+    # find QRS-onset
+    qrs_onset_tmp, qrs_onset = findQRSonset(ecg, qrs_idx, 0.200, 0.015, interval)
 
-    qd_temp = None
-    while qd_temp is None:
-        speed_down[speed_down < velocity_threshold] = 0.
-        qd_temp = getInx(speed_down, probes_15ms)
-        velocity_threshold += velocity_threshold_inc
-    qd = qrs_idx - qd_temp
+    qrs_end_tmp, qrs_end = findQRSend(ecg, qrs_idx, 0.200, 0.015, interval)
 
-    speed = speed[::-1]
-    for i in range(len(speed) - qd_temp, len(speed) - acc_pts):  # -5 added to avoid calculation of speed after R-peak
-        sum_right = sum(speed[i + 1:i + acc_pts])
-        sum_left = sum(speed[i - acc_pts:i - 1])
+    # plot calculated points
+    plt.plot(qrs_onset_tmp, ecg[qrs_onset_tmp], 'r*')
+    plt.plot(qrs_onset, ecg[qrs_onset], 'ro')
 
-        acceleration = (sum_right - sum_left)/5
-        if acceleration > 100:
-            q_sapr = qrs_idx - len(speed) + i
-            break
-
-    plt.plot(qd, ecg[qd], 'r*')
-    plt.plot(q_sapr, ecg[q_sapr], 'go')
+    plt.plot(qrs_end_tmp, ecg[qrs_end_tmp], 'g*')
+    plt.plot(qrs_end, ecg[qrs_end], 'go')
 plt.show()
